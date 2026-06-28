@@ -5724,9 +5724,10 @@
   }
 
   // === MEU HISTÓRICO DE PALPITES ===
-  function abrirHistorico() {
+  async function abrirHistorico() {
     const ov = document.getElementById('historico-overlay');
     if (ov) { ov.classList.add('show'); ov.style.display = 'flex'; }
+    if (!bracketDados) bracketDados = (await cloudMeuBracket()) || brkVazio();
     renderHistorico();
   }
   function fecharHistorico() {
@@ -5744,11 +5745,14 @@
       return;
     }
     const encerrados = meus.filter(p => p.gols_a != null);
-    const totalPts = meus.reduce((s, p) => s + (p.meus_pontos || 0), 0);
+    const placarPts = meus.reduce((s, p) => s + (p.meus_pontos || 0), 0);
+    const bracketPts = bracketDados ? brkScore(bracketDados).total : 0;
+    const totalPts = placarPts + bracketPts;
     const cravados = encerrados.filter(p => p.gols_a === p.meu_palpite_a && p.gols_b === p.meu_palpite_b).length;
     const aprov = encerrados.length ? Math.round(100 * cravados / encerrados.length) : 0;
+    const brkTxt = bracketPts > 0 ? ' <small style="color:var(--text-muted)">(placar ' + placarPts + ' + bracket ' + bracketPts + ')</small>' : '';
     let html = '<div class="hist-head"><h3>📜 Meu Histórico de Palpites</h3>' +
-      '<div class="hist-resumo">⭐ <b>' + totalPts + ' pts</b> · ' + meus.length + ' palpites · ' + cravados + ' cravados · ' + aprov + '% aproveit.</div></div>';
+      '<div class="hist-resumo">⭐ <b>' + totalPts + ' pts</b>' + brkTxt + ' · ' + meus.length + ' palpites · ' + cravados + ' cravados · ' + aprov + '% aproveit.</div></div>';
     html += '<div class="hist-list">';
     meus.forEach(p => {
       const encerrada = p.gols_a != null;
