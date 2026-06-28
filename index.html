@@ -3267,6 +3267,36 @@
   </div>
 </div>
 
+<style>
+  .liga-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .liga-chip { border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); border-radius: 999px; padding: 5px 11px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .liga-chip.ativa { border-color: var(--gold, #9a7611); color: var(--gold-bright, #d4af37); background: rgba(212,175,55,0.12); }
+  .liga-chip.liga-add { border-style: dashed; }
+  .liga-info { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .liga-mini { border: 1px solid var(--border-subtle); background: transparent; border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: var(--text-secondary); }
+  .liga-form-sec { margin: 14px 0; text-align: left; }
+  .liga-form-sec .backup-section-title { margin-bottom: 6px; }
+  .liga-form-sec input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; margin-bottom: 8px; box-sizing: border-box; }
+</style>
+<div class="sheet-overlay" id="liga-overlay">
+  <div class="sheet">
+    <h3>🏆 Ligas (bolão privado)</h3>
+    <div class="sheet-sub">Crie uma liga e convide a família/amigos — o ranking fica só entre vocês.</div>
+    <div class="liga-form-sec">
+      <div class="backup-section-title">➕ Criar nova liga</div>
+      <input id="liga-nome" placeholder="Nome da liga (ex: Família Reis)" maxlength="40">
+      <button class="sheet-btn whatsapp" id="liga-criar" style="background:linear-gradient(135deg,var(--gold),var(--gold-bright));color:#1a1505">Criar liga</button>
+    </div>
+    <div class="liga-form-sec">
+      <div class="backup-section-title">🔑 Entrar com código</div>
+      <input id="liga-codigo" placeholder="Código (6 letras)" maxlength="6" style="text-transform:uppercase">
+      <button class="sheet-btn copy" id="liga-entrar">Entrar na liga</button>
+    </div>
+    <div class="palpite-status" id="liga-status"></div>
+    <button class="sheet-btn close" id="liga-cancel">Fechar</button>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="backup-overlay">
   <div class="sheet">
     <h3>Backup / Restaurar</h3>
@@ -5279,6 +5309,106 @@
       '</div>';
   }
 
+  // === LIGAS PRIVADAS (bolão da família) ===
+  let ligaSelecionada = null;     // null = ranking geral; senão id da liga
+  let minhasLigasCache = null;
+  async function cloudMinhasLigas() {
+    if (!sb || !currentUser) return [];
+    try { const { data, error } = await sb.rpc('minhas_ligas'); if (error) throw error; return data || []; }
+    catch (e) { console.error('[Liga] minhas:', e); return []; }
+  }
+  async function cloudCriarLiga(nome) {
+    try { const { data, error } = await sb.rpc('criar_liga', { p_nome: nome }); if (error) throw error; return { ok: true, liga: data && data[0] }; }
+    catch (e) { return { ok: false, msg: e.message }; }
+  }
+  async function cloudEntrarLiga(codigo) {
+    try { const { data, error } = await sb.rpc('entrar_liga', { p_codigo: codigo }); if (error) throw error; return { ok: true, nome: data }; }
+    catch (e) { return { ok: false, msg: e.message }; }
+  }
+  async function cloudRankingLiga(id) {
+    try { const { data, error } = await sb.rpc('ranking_liga', { p_liga_id: id, limite: 50 }); if (error) throw error; return data || []; }
+    catch (e) { console.error('[Liga] ranking:', e); return []; }
+  }
+  async function cloudSairLiga(id) {
+    try { const { error } = await sb.rpc('sair_liga', { p_liga_id: id }); if (error) throw error; return true; }
+    catch (e) { console.error('[Liga] sair:', e); return false; }
+  }
+
+  function rankingRowHtml(r, i, meuApelido) {
+    const cor = r.cor_destaque || '#d4af37';
+    const avatar = r.avatar || (r.apelido || '?').charAt(0).toUpperCase();
+    const isMe = r.apelido === meuApelido;
+    return '<div class="artilheiro-row ' + (i === 0 ? 'top-1' : '') + (isMe ? ' is-me' : '') + '" style="grid-template-columns: 28px 28px 1fr auto">' +
+      '<span class="artilheiro-pos">' + (i + 1) + 'º</span>' +
+      '<span style="display:inline-flex;width:28px;height:28px;border-radius:999px;align-items:center;justify-content:center;background:' + cor + '22;color:' + cor + ';border:2px solid ' + cor + '55;font-size:13px;font-weight:700">' + avatar + '</span>' +
+      '<span class="artilheiro-nome">' + r.apelido + (isMe ? ' <span style="color:var(--green);font-size:10px;font-weight:700">(você)</span>' : '') +
+        '<br><small style="color:var(--text-muted);font-size:10px">' + r.palpites_dados + ' palpites · ' + r.placares_certos + ' placares certos</small>' +
+      '</span>' +
+      '<span class="artilheiro-gols">' + r.pontos + ' <small>pts</small></span>' +
+      '</div>';
+  }
+
+  // Renderiza a barra de ligas + o ranking da seleção atual (geral ou liga)
+  async function renderRankingComLigas(meuApelido, geralSeed) {
+    const rankListEl = document.getElementById('tabela-ranking-list');
+    if (!rankListEl) return;
+    if (minhasLigasCache === null) minhasLigasCache = await cloudMinhasLigas();
+    const ligas = minhasLigasCache || [];
+    if (ligaSelecionada && !ligas.some(l => l.id === ligaSelecionada)) ligaSelecionada = null;
+
+    let rows, ligaAtual = null;
+    if (ligaSelecionada) {
+      ligaAtual = ligas.find(l => l.id === ligaSelecionada);
+      rows = await cloudRankingLiga(ligaSelecionada);
+    } else {
+      rows = (geralSeed !== undefined) ? geralSeed : await cloudRankingPublico();
+    }
+    rows = rows || [];
+
+    const chips = '<button class="liga-chip' + (!ligaSelecionada ? ' ativa' : '') + '" data-liga="">🌍 Geral</button>' +
+      ligas.map(l => '<button class="liga-chip' + (ligaSelecionada === l.id ? ' ativa' : '') + '" data-liga="' + l.id + '">🏆 ' + l.nome + ' <small>(' + l.membros + ')</small></button>').join('') +
+      '<button class="liga-chip liga-add" data-liga="__add">➕ Liga</button>';
+    let info = '';
+    if (ligaAtual) {
+      info = '<div class="liga-info">Código: <b>' + ligaAtual.codigo + '</b>' +
+        '<button class="liga-mini" data-liga-share="' + ligaAtual.codigo + '" data-liga-nome="' + ligaAtual.nome + '">📤 convidar</button>' +
+        '<button class="liga-mini" data-liga-sair="' + ligaAtual.id + '">🚪 sair</button></div>';
+    }
+    const rowsHtml = rows.length
+      ? rows.map((r, i) => rankingRowHtml(r, i, meuApelido)).join('')
+      : '<div style="text-align:center;padding:14px;color:var(--text-muted);font-style:italic;font-size:13px">' + (ligaSelecionada ? '🎯 Ninguém da liga palpitou ainda.' : '🎯 Ninguém deu palpite ainda. Seja o primeiro!') + '</div>';
+    rankListEl.innerHTML = '<div class="liga-bar">' + chips + '</div>' + info + rowsHtml;
+
+    rankListEl.querySelectorAll('.liga-chip').forEach(c => c.addEventListener('click', async () => {
+      const v = c.dataset.liga;
+      if (v === '__add') { abrirLigaModal(); return; }
+      ligaSelecionada = v || null;
+      await renderRankingComLigas(meuApelido);
+    }));
+    const shareL = rankListEl.querySelector('[data-liga-share]');
+    if (shareL) shareL.addEventListener('click', () => {
+      const cod = shareL.dataset.ligaShare, nome = shareL.dataset.ligaNome;
+      const url = window.location.href.split('#')[0].split('?')[0];
+      const msg = '🏆 Entra na nossa liga "' + nome + '" no bolão da Copa 2026!\nCódigo: ' + cod + '\n\n' + url;
+      window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+    });
+    const sairL = rankListEl.querySelector('[data-liga-sair]');
+    if (sairL) sairL.addEventListener('click', async () => {
+      if (!confirm('Sair dessa liga?')) return;
+      await cloudSairLiga(sairL.dataset.ligaSair);
+      minhasLigasCache = null; ligaSelecionada = null;
+      await renderRankingComLigas(meuApelido);
+    });
+  }
+
+  function abrirLigaModal() {
+    document.getElementById('liga-nome').value = '';
+    document.getElementById('liga-codigo').value = '';
+    const st = document.getElementById('liga-status'); st.textContent = ''; st.className = 'palpite-status';
+    document.getElementById('liga-overlay').classList.add('show');
+  }
+  function fecharLigaModal() { document.getElementById('liga-overlay').classList.remove('show'); }
+
   async function loadAndRenderTabela() {
     const container = document.getElementById('tabela-content');
     if (!container) return;
@@ -5355,26 +5485,9 @@
           const loginOverlay = document.getElementById('login-overlay');
           if (loginOverlay) loginOverlay.classList.add('show');
         });
-      } else if (ranking && ranking.length > 0) {
-        if (rankToggle) rankToggle.style.display = 'inline-block';
-        rankListEl.innerHTML = ranking.map((r, i) => {
-          const cor = r.cor_destaque || '#d4af37';
-          const avatar = r.avatar || (r.apelido || '?').charAt(0).toUpperCase();
-          const isMe = r.apelido === meuApelido;
-          const aproveit = r.palpites_dados > 0 ? Math.round(100 * r.placares_certos / r.palpites_dados) : 0;
-          return '<div class="artilheiro-row ' + (i === 0 ? 'top-1' : '') + (isMe ? ' is-me' : '') + '" style="grid-template-columns: 28px 28px 1fr auto">' +
-            '<span class="artilheiro-pos">' + (i + 1) + 'º</span>' +
-            '<span style="display:inline-flex;width:28px;height:28px;border-radius:999px;align-items:center;justify-content:center;background:' + cor + '22;color:' + cor + ';border:2px solid ' + cor + '55;font-size:13px;font-weight:700">' + avatar + '</span>' +
-            '<span class="artilheiro-nome">' + r.apelido + (isMe ? ' <span style="color:var(--green);font-size:10px;font-weight:700">(você)</span>' : '') +
-              '<br><small style="color:var(--text-muted);font-size:10px">' + r.palpites_dados + ' palpites · ' + r.placares_certos + ' placares certos</small>' +
-            '</span>' +
-            '<span class="artilheiro-gols">' + r.pontos + ' <small>pts</small></span>' +
-            '</div>';
-        }).join('');
       } else {
-        if (rankToggle) rankToggle.style.display = 'none';
-        rankListEl.style.display = 'block';
-        rankListEl.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text-muted);font-style:italic;font-size:13px">🎯 Ninguém deu palpite ainda. Seja o primeiro!</div>';
+        if (rankToggle) rankToggle.style.display = 'inline-block';
+        renderRankingComLigas(meuApelido, ranking || []);
       }
     }
 
@@ -5722,6 +5835,44 @@
     if (tutOk) tutOk.addEventListener('click', fecharTutorial);
     if (tutOver) tutOver.addEventListener('click', (e) => { if (e.target === tutOver) fecharTutorial(); });
     if (helpFab) helpFab.addEventListener('click', abrirTutorial);
+
+    // Modal de Ligas (criar / entrar)
+    const ligaOver = document.getElementById('liga-overlay');
+    const ligaCancel = document.getElementById('liga-cancel');
+    const ligaCriar = document.getElementById('liga-criar');
+    const ligaEntrar = document.getElementById('liga-entrar');
+    if (ligaOver) ligaOver.addEventListener('click', (e) => { if (e.target === ligaOver) fecharLigaModal(); });
+    if (ligaCancel) ligaCancel.addEventListener('click', fecharLigaModal);
+    if (ligaCriar) ligaCriar.addEventListener('click', async () => {
+      const nome = document.getElementById('liga-nome').value.trim();
+      const st = document.getElementById('liga-status');
+      if (!nome) { st.textContent = '⚠️ Dê um nome pra liga'; st.className = 'palpite-status error'; return; }
+      ligaCriar.disabled = true; ligaCriar.textContent = 'Criando...';
+      const r = await cloudCriarLiga(nome);
+      ligaCriar.disabled = false; ligaCriar.textContent = 'Criar liga';
+      if (r.ok && r.liga) {
+        minhasLigasCache = null; ligaSelecionada = r.liga.id;
+        fecharLigaModal();
+        showToast('🏆 Liga criada! Código: ' + r.liga.codigo);
+        await renderRankingComLigas(currentProfile?.apelido || '');
+      } else { st.textContent = '⚠️ ' + (r.msg || 'Erro ao criar'); st.className = 'palpite-status error'; }
+    });
+    if (ligaEntrar) ligaEntrar.addEventListener('click', async () => {
+      const cod = document.getElementById('liga-codigo').value.trim().toUpperCase();
+      const st = document.getElementById('liga-status');
+      if (cod.length < 4) { st.textContent = '⚠️ Digite o código da liga'; st.className = 'palpite-status error'; return; }
+      ligaEntrar.disabled = true; ligaEntrar.textContent = 'Entrando...';
+      const r = await cloudEntrarLiga(cod);
+      ligaEntrar.disabled = false; ligaEntrar.textContent = 'Entrar na liga';
+      if (r.ok) {
+        minhasLigasCache = await cloudMinhasLigas();
+        const liga = (minhasLigasCache || []).find(l => l.codigo === cod);
+        ligaSelecionada = liga ? liga.id : null;
+        fecharLigaModal();
+        showToast('✅ Você entrou na liga ' + (r.nome || '') + '!');
+        await renderRankingComLigas(currentProfile?.apelido || '');
+      } else { st.textContent = '⚠️ ' + (r.msg || 'Código não encontrado'); st.className = 'palpite-status error'; }
+    });
 
     // Botão sincronizar (acessível pra todos)
     const syncBtn = document.getElementById('tabela-sync-btn');
