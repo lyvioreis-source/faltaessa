@@ -53,6 +53,7 @@
     --text-secondary: #a8a39a;
     --text-muted: #6b6760;
     --shadow-card: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+    --shadow-hover: 0 2px 6px rgba(0,0,0,0.45), 0 18px 44px rgba(0,0,0,0.5);
     --grain-a: rgba(212, 175, 55, 0.04);
     --grain-b: rgba(74, 222, 128, 0.025);
     --track: rgba(255,255,255,0.04);
@@ -77,6 +78,7 @@
     --text-secondary: #6b6456;
     --text-muted: #9c9486;
     --shadow-card: 0 1px 2px rgba(70,55,20,0.06), 0 10px 30px rgba(70,55,20,0.10);
+    --shadow-hover: 0 3px 8px rgba(70,55,20,0.10), 0 20px 48px rgba(70,55,20,0.18);
     --grain-a: rgba(180, 140, 30, 0.06);
     --grain-b: rgba(31, 157, 87, 0.04);
     --track: rgba(40,33,20,0.07);
@@ -7618,5 +7620,45 @@
     startApp();
   }
 </script>
+<style>
+  /* ===== POLIMENTO GLOBAL (camada de acabamento — vence a cascata) ===== */
+  /* Transições suaves nos elementos interativos */
+  button, .toggle-btn, .sheet-btn, .main-tab, .chip, .liga-chip, .qtd-btn,
+  .card, .partida-card, .hist-row, .hoje-jogo, .artilheiro-row, .chav-grupo,
+  .brk-team, .trades-card, .admin-card, input, select, textarea {
+    transition: transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .22s ease,
+                border-color .2s ease, background-color .2s ease, color .2s ease;
+  }
+  /* Cards "levantam" de leve ao passar/tocar */
+  .card:hover, .partida-card:hover, .hist-row:hover, .hoje-jogo:hover,
+  .trades-card:hover, .admin-card:hover, .chav-grupo:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+  /* Botões: realce no hover, pressão no clique (ótimo no toque) */
+  .toggle-btn:hover, .sheet-btn:hover { transform: translateY(-1px); }
+  .toggle-btn:active, .sheet-btn:active, .chip:active, .liga-chip:active,
+  .hoje-jogo:active, .partida-card:active, .hist-row:active, .brk-team:active, button:active {
+    transform: scale(.97);
+  }
+  /* Foco acessível (navegação por teclado) */
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  /* Inputs com anel dourado ao focar */
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 0 3px var(--gold-soft);
+    outline: none;
+  }
+  /* Brilho sutil nos botões dourados principais */
+  .sheet-btn.whatsapp { box-shadow: 0 4px 14px rgba(212,175,55,0.26); }
+  /* Rolagem suave + scrollbar discreta no tema */
+  html { scroll-behavior: smooth; }
+  * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+  *::-webkit-scrollbar { width: 9px; height: 9px; }
+  *::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  /* Imagens de bandeira sempre nítidas e proporcionais */
+  .flag img { object-fit: cover; }
+</style>
 </body>
 </html>
