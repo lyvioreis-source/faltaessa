@@ -10,6 +10,16 @@
 <meta name="format-detection" content="telephone=no">
 <title>Meu Álbum da Copa · Rastreador de Figurinhas</title>
 <!-- Rastreador de Figurinhas - Copa do Mundo Panini -->
+<!-- PWA: instalável no celular -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('SW não registrou:', e); });
+    });
+  }
+</script>
 
 <!-- ============================================================== -->
 <!-- SUPABASE (Fase 1) — carrega a biblioteca oficial via CDN.        -->
@@ -3239,6 +3249,24 @@
 </div>
 
 <!-- BACKUP SHEET -->
+<style>
+  #help-fab { position: fixed; left: 14px; bottom: 14px; z-index: 60; width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--gold,#9a7611); background: var(--bg-elevated,#fff); color: var(--gold,#9a7611); font-size: 19px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.22); display: none; align-items: center; justify-content: center; }
+  .tut-step { display: flex; gap: 10px; align-items: flex-start; text-align: left; margin: 13px 0; font-size: 13px; line-height: 1.45; color: var(--text-secondary, inherit); }
+  .tut-ico { font-size: 22px; flex-shrink: 0; line-height: 1.2; }
+  .tut-step b { color: var(--text-primary, inherit); }
+</style>
+<button id="help-fab" title="Como funciona" aria-label="Ajuda">❓</button>
+<div class="sheet-overlay" id="tutorial-overlay">
+  <div class="sheet">
+    <h3>👋 Bem-vindo ao Falta Essa!</h3>
+    <div class="sheet-sub">Seu companheiro da Copa 2026: álbum de figurinhas, trocas e bolão.</div>
+    <div class="tut-step"><span class="tut-ico">📒</span><div><b>Figurinhas</b><br>Toque pra marcar: <b>1×</b> tenho · <b>2×</b> repetida (dourada) · <b>3×</b> limpa. <b>Segure</b> numa dourada pra dizer quantas repetidas você tem.</div></div>
+    <div class="tut-step"><span class="tut-ico">🤝</span><div><b>Trocas</b><br>Marque suas repetidas e complete o perfil (apelido, cidade, WhatsApp) pra achar gente perto de você pra trocar.</div></div>
+    <div class="tut-step"><span class="tut-ico">🏆</span><div><b>Bolão</b><br>Na aba <b>Tabela</b>, palpite os placares (fecham <b>1h antes</b> do jogo). <b>3 pts</b> placar exato · <b>1 pt</b> acertou o resultado. Veja ranking e chaveamento.</div></div>
+    <button class="sheet-btn whatsapp" id="tutorial-ok" style="background:linear-gradient(135deg,var(--gold),var(--gold-bright));color:#1a1505">Bora jogar! ⚽</button>
+  </div>
+</div>
+
 <div class="sheet-overlay" id="backup-overlay">
   <div class="sheet">
     <h3>Backup / Restaurar</h3>
@@ -3472,12 +3500,28 @@
     }
   }
 
+  // === MINI-TUTORIAL (1ª vez) ===
+  const TUTORIAL_KEY = 'panini_wc_tutorial_v1';
+  function abrirTutorial() { const o = document.getElementById('tutorial-overlay'); if (o) o.classList.add('show'); }
+  function fecharTutorial() {
+    const o = document.getElementById('tutorial-overlay'); if (o) o.classList.remove('show');
+    try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch (e) {}
+  }
+  function maybeShowTutorial() {
+    let visto = false;
+    try { visto = localStorage.getItem(TUTORIAL_KEY) === '1'; } catch (e) {}
+    if (!visto) setTimeout(abrirTutorial, 700);
+  }
+
   function showAppLoggedIn() {
     const screen = document.getElementById('login-screen');
     const logoutBtn = document.getElementById('logout-btn');
     if (screen) screen.style.display = 'none';
     if (logoutBtn) logoutBtn.style.display = 'flex';
     updateUserPill();
+    const fab = document.getElementById('help-fab');
+    if (fab) fab.style.display = 'flex';
+    maybeShowTutorial();
     // O loadState + render é tratado pelo startApp()
   }
 
@@ -5670,6 +5714,14 @@
         'Vem jogar comigo: ' + url;
       window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
     });
+
+    // Tutorial (1ª vez) + botão de ajuda flutuante
+    const tutOk = document.getElementById('tutorial-ok');
+    const tutOver = document.getElementById('tutorial-overlay');
+    const helpFab = document.getElementById('help-fab');
+    if (tutOk) tutOk.addEventListener('click', fecharTutorial);
+    if (tutOver) tutOver.addEventListener('click', (e) => { if (e.target === tutOver) fecharTutorial(); });
+    if (helpFab) helpFab.addEventListener('click', abrirTutorial);
 
     // Botão sincronizar (acessível pra todos)
     const syncBtn = document.getElementById('tabela-sync-btn');

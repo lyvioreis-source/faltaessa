@@ -1,0 +1,15 @@
+{
+  "name": "Falta Essa — Copa 2026",
+  "short_name": "Falta Essa",
+  "description": "Álbum de figurinhas + bolão da Copa do Mundo 2026",
+  "lang": "pt-BR",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f5f2ea",
+  "theme_color": "#9a7611",
+  "icons": [
+    { "src": "icon.png", "sizes": "192x192 380x380 512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
