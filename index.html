@@ -2351,63 +2351,47 @@
   .chav-grupo-time .chav-flag img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   /* Bracket area */
+  /* ===== CHAVEAMENTO "Caminho até a Final": colunas por fase fluindo pro centro ===== */
+  .chav-bracket-wrap { overflow-x: auto; padding: 6px 2px 12px; -webkit-overflow-scrolling: touch; }
   .chav-bracket {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: 14px;
-    align-items: center;
-    margin: 12px 0;
+    display: flex; align-items: stretch; justify-content: center; gap: 8px;
+    min-width: 980px; min-height: 540px; margin: 10px auto;
   }
-  .chav-bracket-titulo {
-    font-family: 'Bebas Neue', sans-serif;
-    color: var(--gold);
-    font-size: 14px;
-    letter-spacing: 0.1em;
-    text-align: center;
-    margin-bottom: 6px;
+  .chav-col { display: flex; flex-direction: column; flex: 0 0 104px; }
+  .chav-col-tit {
+    font-family: 'Bebas Neue', sans-serif; color: var(--gold); font-size: 13px;
+    letter-spacing: 0.08em; text-align: center; margin-bottom: 8px; white-space: nowrap; text-transform: uppercase;
   }
-  .chav-bracket-side {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
+  .chav-col-matches { flex: 1; display: flex; flex-direction: column; justify-content: space-around; gap: 4px; }
+  .chav-center { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 190px; gap: 6px; text-align: center; }
+  .chav-final-tit { font-size: 22px; color: var(--gold-bright); letter-spacing: 0.14em; margin-bottom: 2px; }
+  .chav-final-match { width: 100%; max-width: 172px; }
+  .chav-final-match .chav-bracket-match { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold-soft), var(--shadow-card); }
+  .chav-trofeu-box { display: flex; flex-direction: column; align-items: center; margin: 2px 0; }
+  .chav-trofeu-box h3 { font-family: 'Bebas Neue', sans-serif; font-size: 12px; color: var(--text-muted); letter-spacing: 0.12em; margin-bottom: 0; }
+  .chav-mascote-trofeu { width: 120px; height: auto; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.20)); animation: mascoteBounce 3s ease-in-out infinite; }
+  .chav-3o { width: 100%; max-width: 172px; margin-top: 4px; }
+  .chav-3o .chav-col-tit { font-size: 10px; margin-bottom: 4px; }
+
   .chav-bracket-match {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
-    color: var(--text-primary);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-height: 38px;
-    box-shadow: var(--shadow-card);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 7px;
+    padding: 5px 8px; font-size: 11px; color: var(--text-primary);
+    display: flex; flex-direction: column; gap: 3px; min-height: 42px; box-shadow: var(--shadow-card);
   }
-  .chav-bracket-match.played {
-    background: linear-gradient(135deg, var(--gold-soft), var(--bg-elevated));
-    border-color: rgba(212,175,55,0.4);
-  }
-  .chav-bracket-team {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-weight: 700;
-    font-size: 11px;
-  }
-  .chav-bracket-team.winner { color: #1a5e1a; }
-  .chav-bracket-team.loser { color: #999; text-decoration: line-through; }
-  .chav-bracket-team .chav-flag { width: 16px; height: 12px; border-radius: 2px; overflow:hidden; }
+  .chav-bracket-match.played { background: linear-gradient(135deg, var(--gold-soft), var(--bg-elevated)); border-color: rgba(212,175,55,0.4); }
+  .chav-bracket-team { display: flex; align-items: center; gap: 5px; font-weight: 700; font-size: 11px; }
+  .chav-bracket-team.winner { color: var(--green); font-weight: 800; }
+  .chav-bracket-team.loser { color: var(--text-muted); text-decoration: line-through; }
+  .chav-bracket-team .chav-flag { width: 18px; height: 13px; border-radius: 2px; overflow: hidden; flex-shrink: 0; }
   .chav-bracket-team .chav-flag img { width: 100%; height: 100%; object-fit: cover; }
   .chav-bracket-team .chav-score { margin-left: auto; font-family: 'Bebas Neue', sans-serif; font-size: 13px; }
-  .chav-bracket-empty { color: #aaa; font-style: italic; font-size: 10px; }
+  .chav-bracket-empty { color: var(--text-muted); font-style: italic; font-size: 10px; text-align: center; }
+  /* conectores: pequena haste apontando pro centro */
+  .chav-col-l .chav-bracket-match, .chav-col-r .chav-bracket-match { position: relative; }
+  .chav-col-l .chav-bracket-match::after { content: ''; position: absolute; right: -8px; top: 50%; width: 8px; height: 1px; background: rgba(212,175,55,0.45); }
+  .chav-col-r .chav-bracket-match::after { content: ''; position: absolute; left: -8px; top: 50%; width: 8px; height: 1px; background: rgba(212,175,55,0.45); }
 
-  @media (max-width: 900px) {
-    .chav-grupos { grid-template-columns: repeat(3, 1fr); }
-    .chav-bracket { grid-template-columns: 1fr; }
-    .chav-bracket-side { flex-direction: row; flex-wrap: wrap; }
-    .chav-bracket-match { flex: 1 1 calc(50% - 6px); min-width: 140px; }
-  }
+  @media (max-width: 900px) { .chav-grupos { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 480px) {
     .chav-grupos { grid-template-columns: repeat(2, 1fr); }
     .chav-grupo-time { font-size: 8px; }
@@ -6002,6 +5986,10 @@
       while (fillEmpty && arr.length < fillEmpty) arr.push(null);
       return arr.map(p => chavMatchHtml(p)).join('');
     }
+    function colWrap(label, items, fill, lado) {
+      return '<div class="chav-col chav-col-' + lado + '"><div class="chav-col-tit">' + label + '</div>' +
+        '<div class="chav-col-matches">' + colHtml(items, fill) + '</div></div>';
+    }
 
     container.innerHTML =
       '<div class="chav-title">' +
@@ -6011,25 +5999,22 @@
       '<div class="chav-section-top">' +
         '<div class="chav-grupos">' + gruposTopHtml + '</div>' +
       '</div>' +
-      '<div class="chav-bracket">' +
-        '<div class="chav-bracket-side">' +
-          '<div class="chav-bracket-titulo">ROUND OF 32</div>' +
-          colHtml(r32Esq, 8) +
+      '<div class="chav-bracket-wrap"><div class="chav-bracket">' +
+        colWrap('R32', r32Esq, 8, 'l') +
+        colWrap('Oitavas', r16Esq, 4, 'l') +
+        colWrap('Quartas', quartasEsq, 2, 'l') +
+        colWrap('Semi', semiEsq ? [semiEsq] : [], 1, 'l') +
+        '<div class="chav-center">' +
+          '<div class="chav-col-tit chav-final-tit">FINAL</div>' +
+          '<div class="chav-final-match">' + chavMatchHtml(final) + '</div>' +
+          '<div class="chav-trofeu-box"><h3>CAMPEÃO MUNDIAL</h3>' + campeaoHtml + '</div>' +
+          '<div class="chav-3o"><div class="chav-col-tit">3º Lugar</div>' + chavMatchHtml(terceiro) + '</div>' +
         '</div>' +
-        '<div class="chav-section-middle">' +
-          '<h3>CAMPEÃO MUNDIAL</h3>' +
-          campeaoHtml +
-          '<div style="margin-top:14px;font-size:11px;color:var(--text-muted);letter-spacing:0.1em">' +
-            (terceiro && terceiro.gols_a != null ?
-              '🥉 3º lugar: ' + (terceiro.gols_a > terceiro.gols_b ? terceiro.time_a : terceiro.time_b)
-              : 'BRONZE WINNER: a definir') +
-          '</div>' +
-        '</div>' +
-        '<div class="chav-bracket-side">' +
-          '<div class="chav-bracket-titulo">ROUND OF 32</div>' +
-          colHtml(r32Dir, 8) +
-        '</div>' +
-      '</div>' +
+        colWrap('Semi', semiDir ? [semiDir] : [], 1, 'r') +
+        colWrap('Quartas', quartasDir, 2, 'r') +
+        colWrap('Oitavas', r16Dir, 4, 'r') +
+        colWrap('R32', r32Dir, 8, 'r') +
+      '</div></div>' +
       '<div class="chav-section-bottom">' +
         '<div class="chav-grupos">' + gruposBottomHtml + '</div>' +
         (Object.keys(classif).length ? '<div class="chav-legenda"><span class="leg-verde">■</span> <b>1º e 2º</b> · <span class="leg-ouro">■</span> <b>3º</b> (melhor terceiro) · <span class="leg-verde">✓</span> <b>vaga garantida</b> · nº à direita = pontos</div>' : '') +
