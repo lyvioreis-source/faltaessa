@@ -2386,10 +2386,16 @@
   .chav-bracket-team .chav-flag img { width: 100%; height: 100%; object-fit: cover; }
   .chav-bracket-team .chav-score { margin-left: auto; font-family: 'Bebas Neue', sans-serif; font-size: 13px; }
   .chav-bracket-empty { color: var(--text-muted); font-style: italic; font-size: 10px; text-align: center; }
-  /* conectores: pequena haste apontando pro centro */
+  /* Conectores "elbow": pares aninhados com linhas douradas */
+  .chav-bracket { gap: 18px; }
+  .chav-pair { display: flex; flex-direction: column; justify-content: space-around; flex: 1; position: relative; }
   .chav-col-l .chav-bracket-match, .chav-col-r .chav-bracket-match { position: relative; }
-  .chav-col-l .chav-bracket-match::after { content: ''; position: absolute; right: -8px; top: 50%; width: 8px; height: 1px; background: rgba(212,175,55,0.45); }
-  .chav-col-r .chav-bracket-match::after { content: ''; position: absolute; left: -8px; top: 50%; width: 8px; height: 1px; background: rgba(212,175,55,0.45); }
+  .chav-col-l .chav-bracket-match::after { content: ''; position: absolute; right: -9px; top: 50%; width: 9px; height: 2px; background: rgba(212,175,55,0.5); }
+  .chav-col-l .chav-pair::before { content: ''; position: absolute; right: -9px; top: 25%; bottom: 25%; width: 2px; background: rgba(212,175,55,0.5); }
+  .chav-col-l .chav-pair::after { content: ''; position: absolute; right: -18px; top: 50%; width: 9px; height: 2px; background: rgba(212,175,55,0.5); }
+  .chav-col-r .chav-bracket-match::after { content: ''; position: absolute; left: -9px; top: 50%; width: 9px; height: 2px; background: rgba(212,175,55,0.5); }
+  .chav-col-r .chav-pair::before { content: ''; position: absolute; left: -9px; top: 25%; bottom: 25%; width: 2px; background: rgba(212,175,55,0.5); }
+  .chav-col-r .chav-pair::after { content: ''; position: absolute; left: -18px; top: 50%; width: 9px; height: 2px; background: rgba(212,175,55,0.5); }
 
   @media (max-width: 900px) { .chav-grupos { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 480px) {
@@ -2993,6 +2999,8 @@
         .chav-pts { margin-left: auto; font-weight: 800; font-size: 11px; color: var(--gold-bright, #d4af37); }
         .chav-grupo-time.chav-classificado { background: rgba(34,197,94,0.16); }
         .chav-grupo-time.chav-repescagem { background: rgba(212,175,55,0.13); }
+        .chav-grupo-time.chav-eliminado { opacity: 0.45; }
+        .chav-grupo-time.chav-eliminado span { text-decoration: line-through; }
         .chav-ok { color: var(--green, #1f9d57); font-weight: 800; margin-left: 1px; font-size: 11px; }
         .chav-match-quando { font-size: 9px; color: var(--text-muted, #888); text-align: center; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chav-legenda { text-align:center; font-size:11px; color: var(--text-muted,#888); margin-top:8px; }
@@ -5634,7 +5642,7 @@
     } catch (e) { console.error('[Bracket] save:', e); return false; }
   }
 
-  function brkR32Ordenado() { return (tabelaCache || []).filter(p => p.fase === 'r32').sort((a, b) => a.id - b.id); }
+  function brkR32Ordenado() { return (tabelaCache || []).filter(p => p.fase === 'r32').sort((a, b) => (a.external_id || a.id) - (b.external_id || b.id)); }
   function brkVazio() { return { r32: [], r16: [], qf: [], sf: [], final: [] }; }
   function brkSanitiza(dados) {
     for (let ri = 1; ri < BRK_ROUNDS.length; ri++) {
@@ -5863,7 +5871,7 @@
     return garant;
   }
 
-  function chavGrupoHtml(grupo, times, classif) {
+  function chavGrupoHtml(grupo, times, classif, tercClass) {
     let timesHtml, temClassif = false;
     if (classif && classif.length) {
       temClassif = true;
@@ -5874,8 +5882,14 @@
       (times || []).forEach(t => { if (!vistos[t]) rows.push({ posicao: rows.length + 1, selecao: t, pontos: 0, jogos: 0, vitorias: 0, empates: 0, derrotas: 0, saldo: 0 }); });
       const garant = timesGarantidos(rows);
       timesHtml = rows.map(c => {
-        const cls = c.posicao <= 2 ? ' chav-classificado' : (c.posicao === 3 ? ' chav-repescagem' : '');
-        const ok = garant[c.selecao] ? '<span class="chav-ok" title="Vaga garantida">✓</span>' : '';
+        let cls = '', extra = '';
+        if (c.posicao <= 2) cls = ' chav-classificado';
+        else if (c.posicao === 3) {
+          if (!tercClass) cls = ' chav-repescagem';
+          else if (tercClass.has(c.selecao)) { cls = ' chav-classificado'; extra = '<span class="chav-ok" title="Classificado como melhor 3º">✓</span>'; }
+          else cls = ' chav-eliminado';
+        }
+        const ok = garant[c.selecao] ? '<span class="chav-ok" title="Vaga garantida">✓</span>' : extra;
         const tip = 'J' + c.jogos + ' · ' + c.vitorias + 'V ' + c.empates + 'E ' + c.derrotas + 'D · SG ' + (c.saldo > 0 ? '+' : '') + c.saldo;
         return '<div class="chav-grupo-time' + cls + '" title="' + tip + '">' +
           '<span class="chav-pos">' + c.posicao + '</span>' +
@@ -5937,14 +5951,20 @@
     // Renderiza grupos (top: A-F, bottom: G-L)
     const gruposTop = ['A','B','C','D','E','F'];
     const gruposBottom = ['G','H','I','J','K','L'];
-    const gruposTopHtml = gruposTop.map(g => chavGrupoHtml(g, grupos[g] || [], classif[g])).join('');
-    const gruposBottomHtml = gruposBottom.map(g => chavGrupoHtml(g, grupos[g] || [], classif[g])).join('');
+    // 8 melhores terceiros (formato 2026) — só marca quando todos os 12 grupos têm 3º
+    const terceiros = [];
+    Object.keys(classif).forEach(g => { const t = (classif[g] || []).find(c => c.posicao === 3); if (t) terceiros.push(t); });
+    terceiros.sort((a, b) => (b.pontos - a.pontos) || (b.saldo - a.saldo) || (b.gols_pro - a.gols_pro) || (a.selecao < b.selecao ? -1 : 1));
+    const tercClass = terceiros.length === 12 ? new Set(terceiros.slice(0, 8).map(t => t.selecao)) : null;
+    const gruposTopHtml = gruposTop.map(g => chavGrupoHtml(g, grupos[g] || [], classif[g], tercClass)).join('');
+    const gruposBottomHtml = gruposBottom.map(g => chavGrupoHtml(g, grupos[g] || [], classif[g], tercClass)).join('');
 
     // Encontra partidas das fases finais
-    const r32 = partidas.filter(p => p.fase === 'r32').sort((a,b) => a.id - b.id);
-    const r16 = partidas.filter(p => p.fase === 'r16').sort((a,b) => a.id - b.id);
-    const quartas = partidas.filter(p => p.fase === 'quartas').sort((a,b) => a.id - b.id);
-    const semi = partidas.filter(p => p.fase === 'semi').sort((a,b) => a.id - b.id);
+    const ordemBracket = (a, b) => (a.external_id || a.id) - (b.external_id || b.id);
+    const r32 = partidas.filter(p => p.fase === 'r32').sort(ordemBracket);
+    const r16 = partidas.filter(p => p.fase === 'r16').sort(ordemBracket);
+    const quartas = partidas.filter(p => p.fase === 'quartas').sort(ordemBracket);
+    const semi = partidas.filter(p => p.fase === 'semi').sort(ordemBracket);
     const final = partidas.find(p => p.fase === 'final');
     const terceiro = partidas.find(p => p.fase === '3o_lugar');
 
@@ -5987,8 +6007,17 @@
       return arr.map(p => chavMatchHtml(p)).join('');
     }
     function colWrap(label, items, fill, lado) {
+      let arr = items.slice();
+      while (arr.length < fill) arr.push(null);
+      let inner;
+      if (fill > 1) {
+        inner = '';
+        for (let i = 0; i < arr.length; i += 2) inner += '<div class="chav-pair">' + chavMatchHtml(arr[i]) + chavMatchHtml(arr[i + 1]) + '</div>';
+      } else {
+        inner = chavMatchHtml(arr[0]);
+      }
       return '<div class="chav-col chav-col-' + lado + '"><div class="chav-col-tit">' + label + '</div>' +
-        '<div class="chav-col-matches">' + colHtml(items, fill) + '</div></div>';
+        '<div class="chav-col-matches">' + inner + '</div></div>';
     }
 
     container.innerHTML =
