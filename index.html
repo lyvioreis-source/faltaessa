@@ -3231,25 +3231,35 @@
 
     <!-- MODAL: MEU HISTÓRICO DE PALPITES -->
     <style>
-      #historico-content { padding: 4px 2px 16px; }
-      .hist-head { text-align: center; margin-bottom: 12px; }
-      .hist-head h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.06em; font-size: 24px; color: var(--gold-bright,#d4af37); margin: 0; }
+      #historico-content { padding: 4px 2px 18px; }
+      .hist-head { text-align: center; margin-bottom: 14px; }
+      .hist-head h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.06em; font-size: 25px; color: var(--gold-bright,#d4af37); margin: 0; }
       .hist-resumo { font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
       .hist-resumo b { color: var(--gold-bright,#d4af37); }
-      .hist-vazio { text-align: center; padding: 30px 16px; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
-      .hist-list { display: flex; flex-direction: column; gap: 6px; max-width: 560px; margin: 0 auto; }
-      .hist-row { display: flex; align-items: center; gap: 10px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 8px 10px; }
-      .hist-data { font-size: 11px; color: var(--text-muted); text-align: center; min-width: 42px; font-weight: 700; }
-      .hist-data small { font-weight: 600; opacity: 0.8; font-size: 9px; }
-      .hist-jogo { flex: 1; font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.5; }
-      .hist-jogo b { color: var(--gold-bright,#d4af37); }
-      .hist-jogo small { color: var(--text-muted); font-size: 11px; font-weight: 500; }
-      .hist-jogo .flag { width: 18px; }
-      .hist-badge { min-width: 34px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; }
+      .hist-vazio { text-align: center; padding: 34px 16px; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+      .hist-list { display: flex; flex-direction: column; gap: 8px; max-width: 540px; margin: 0 auto; }
+      .hist-row { display: flex; align-items: center; gap: 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-left-width: 3px; border-radius: 12px; padding: 10px 13px; }
+      .hist-row.r-cravou { border-left-color: var(--gold-bright,#d4af37); }
+      .hist-row.r-acertou { border-left-color: var(--green,#1f9d57); }
+      .hist-row.r-errou { border-left-color: var(--red,#dc2626); }
+      .hist-row.r-aguardando { border-left-color: var(--border-subtle); }
+      .hist-date { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 46px; }
+      .hist-dia { font-weight: 800; font-size: 13px; color: var(--text-primary); }
+      .hist-fase { font-size: 8.5px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-muted); text-transform: uppercase; white-space: nowrap; }
+      .hist-mid { flex: 1; min-width: 0; }
+      .hist-teams { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 14px; color: var(--text-primary); }
+      .hist-teams .hist-vs { color: var(--text-muted); font-weight: 400; }
+      .hist-flag { width: 24px; height: 16px; border-radius: 3px; object-fit: cover; vertical-align: middle; box-shadow: 0 0 0 1px rgba(0,0,0,0.10); flex-shrink: 0; }
+      .hist-flag-x { font-size: 15px; }
+      .hist-scores { display: flex; gap: 14px; margin-top: 5px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+      .hist-scores .lbl { opacity: 0.75; }
+      .hist-pal b { color: var(--gold-bright,#d4af37); font-size: 12.5px; }
+      .hist-real b { color: var(--text-secondary); font-size: 12.5px; }
+      .hist-badge { min-width: 40px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; }
       .hist-badge.cravou { background: var(--gold-bright,#d4af37); color: #1a1505; }
       .hist-badge.acertou { background: rgba(34,197,94,0.18); color: var(--green,#1f9d57); }
-      .hist-badge.errou { background: rgba(120,120,120,0.15); color: var(--text-muted); }
-      .hist-badge.aguardando { background: transparent; color: var(--text-muted); }
+      .hist-badge.errou { background: rgba(220,38,38,0.12); color: var(--red,#dc2626); }
+      .hist-badge.aguardando { background: rgba(120,120,120,0.12); color: var(--text-muted); font-size: 15px; }
     </style>
     <div class="chaveamento-overlay" id="historico-overlay" style="display:none">
       <div class="chaveamento-modal">
@@ -5757,23 +5767,36 @@
     meus.forEach(p => {
       const encerrada = p.gols_a != null;
       const pts = p.meus_pontos || 0;
-      let badge;
-      if (!encerrada) badge = '<span class="hist-badge aguardando">⏳</span>';
-      else if (pts === 3) badge = '<span class="hist-badge cravou">+3</span>';
-      else if (pts === 1) badge = '<span class="hist-badge acertou">+1</span>';
-      else badge = '<span class="hist-badge errou">0</span>';
-      const real = encerrada ? (p.gols_a + '×' + p.gols_b) : '–';
-      const faseTxt = p.grupo ? 'G' + p.grupo : (p.fase || '').toUpperCase();
+      let estado, badge;
+      if (!encerrada) { estado = 'aguardando'; badge = '⏳'; }
+      else if (pts === 3) { estado = 'cravou'; badge = '+3'; }
+      else if (pts === 1) { estado = 'acertou'; badge = '+1'; }
+      else { estado = 'errou'; badge = '0'; }
       const dia = new Date(p.data_hora).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: BR_TZ });
-      html += '<div class="hist-row">' +
-        '<div class="hist-data">' + dia + '<br><small>' + faseTxt + '</small></div>' +
-        '<div class="hist-jogo">' + flagSmallHtml(p.time_a) + ' ' + p.time_a + ' <b>' + p.meu_palpite_a + '×' + p.meu_palpite_b + '</b> ' + p.time_b + ' ' + flagSmallHtml(p.time_b) +
-          '<br><small>resultado: ' + real + '</small></div>' +
-        badge +
+      const fase = histFaseLabel(p);
+      const realTxt = encerrada
+        ? '<span class="hist-real"><span class="lbl">Real</span> <b>' + p.gols_a + '×' + p.gols_b + '</b></span>'
+        : '<span class="hist-real" style="font-style:italic">aguardando o jogo</span>';
+      html += '<div class="hist-row r-' + estado + '">' +
+        '<div class="hist-date"><span class="hist-dia">' + dia + '</span><span class="hist-fase">' + fase + '</span></div>' +
+        '<div class="hist-mid">' +
+          '<div class="hist-teams">' + histFlag(p.time_a) + '<span>' + p.time_a + '</span><span class="hist-vs">×</span><span>' + p.time_b + '</span>' + histFlag(p.time_b) + '</div>' +
+          '<div class="hist-scores"><span class="hist-pal"><span class="lbl">Palpite</span> <b>' + p.meu_palpite_a + '×' + p.meu_palpite_b + '</b></span>' + realTxt + '</div>' +
+        '</div>' +
+        '<div class="hist-badge ' + estado + '">' + badge + '</div>' +
       '</div>';
     });
     html += '</div>';
     el.innerHTML = html;
+  }
+  function histFlag(code) {
+    const info = countryInfo[code];
+    if (info && info.iso) return '<img class="hist-flag" src="https://flagcdn.com/' + info.iso + '.svg" alt="' + code + '" loading="lazy">';
+    return '<span class="hist-flag-x">🏳️</span>';
+  }
+  function histFaseLabel(p) {
+    if (p.grupo) return 'Grupo ' + p.grupo;
+    return ({ r32: 'R32', r16: 'Oitavas', quartas: 'Quartas', semi: 'Semi', final: 'Final', '3o_lugar': '3º lugar' })[p.fase] || (p.fase || '').toUpperCase();
   }
 
   // Modal de chaveamento visual
