@@ -3045,6 +3045,7 @@
         <button class="toggle-btn" id="tabela-admin-avancar-btn" style="display:none" title="Gera as partidas da próxima fase automaticamente">🏆 Gerar próxima fase</button>
         <button class="toggle-btn" id="tabela-sync-btn" title="Sincroniza placares e artilheiros da API">🔄 Sincronizar agora</button>
         <button class="toggle-btn" id="tabela-chaveamento-btn" title="Ver chaveamento visual">🌐 Chaveamento</button>
+        <button class="toggle-btn" id="tabela-meubracket-btn" title="Palpite o mata-mata inteiro">🔮 Meu palpite</button>
       </div>
 
       <div id="tabela-content">
@@ -3192,6 +3193,37 @@
         <button class="chaveamento-close" id="chaveamento-close" title="Fechar">✕</button>
         <div class="chaveamento-content" id="chaveamento-content">
           <div class="trades-loading">Carregando chaveamento...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: MEU PALPITE DO CHAVEAMENTO (bracket) -->
+    <style>
+      #bracket-content { padding: 4px 2px 16px; }
+      .brk-head { text-align: center; margin-bottom: 4px; }
+      .brk-head h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.06em; font-size: 24px; color: var(--gold-bright,#d4af37); margin: 0; }
+      .brk-score { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+      .brk-score b { color: var(--gold-bright,#d4af37); }
+      .brk-aviso { text-align: center; font-size: 12px; color: var(--text-muted); margin: 6px 0 14px; }
+      .brk-round { margin-bottom: 16px; }
+      .brk-round-tit { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; font-size: 17px; color: var(--gold,#9a7611); margin: 0 0 8px; text-align: center; }
+      .brk-matches { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .brk-round.r-final .brk-matches, .brk-round.r-sf .brk-matches { grid-template-columns: 1fr; max-width: 320px; margin: 0 auto; }
+      .brk-match { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 5px; display: flex; flex-direction: column; gap: 4px; }
+      .brk-team { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 7px; cursor: pointer; border: 1.5px solid transparent; background: var(--bg-primary); font-size: 13px; font-weight: 600; color: var(--text-primary); }
+      .brk-team.escolhido { border-color: var(--gold,#9a7611); background: rgba(212,175,55,0.16); }
+      .brk-team.acertou { box-shadow: inset 3px 0 0 var(--green,#1f9d57); }
+      .brk-team.vazio { color: var(--text-muted); cursor: default; font-style: italic; font-weight: 400; }
+      .brk-team .flag { width: 20px; }
+      .brk-bloqueado .brk-team { cursor: default; }
+      .brk-champ { text-align: center; margin: 6px 0 14px; }
+      .brk-champ .brk-champ-nome { font-family: 'Bebas Neue', sans-serif; font-size: 26px; color: var(--gold-bright,#d4af37); }
+    </style>
+    <div class="chaveamento-overlay" id="bracket-overlay" style="display:none">
+      <div class="chaveamento-modal">
+        <button class="chaveamento-close" id="bracket-close" title="Fechar">✕</button>
+        <div class="chaveamento-content" id="bracket-content">
+          <div class="trades-loading">Carregando...</div>
         </div>
       </div>
     </div>
@@ -5521,6 +5553,144 @@
     renderJogosHoje();
   }
 
+  // === MEU PALPITE DO CHAVEAMENTO (bracket completo) ===
+  const BRK_ROUNDS = [
+    { key: 'r32', fase: 'r32', n: 16, tit: 'Round of 32', cls: 'r-r32' },
+    { key: 'r16', fase: 'r16', n: 8, tit: 'Oitavas', cls: 'r-r16' },
+    { key: 'qf', fase: 'quartas', n: 4, tit: 'Quartas', cls: 'r-qf' },
+    { key: 'sf', fase: 'semi', n: 2, tit: 'Semifinal', cls: 'r-sf' },
+    { key: 'final', fase: 'final', n: 1, tit: 'Final', cls: 'r-final' }
+  ];
+  // Pontos por seleção que você acertou que chegaria em cada fase
+  const BRK_PTS = { r16: 1, qf: 2, sf: 4, final: 6, campeao: 12 };
+  let bracketDados = null;
+
+  async function cloudMeuBracket() {
+    if (!sb || !currentUser) return null;
+    try {
+      const { data, error } = await sb.from('bracket_palpites').select('dados').eq('user_id', currentUser.id).maybeSingle();
+      if (error) throw error;
+      return data ? data.dados : null;
+    } catch (e) { console.error('[Bracket] load:', e); return null; }
+  }
+  async function cloudSalvarBracket(dados) {
+    if (!sb || !currentUser) return false;
+    try {
+      const { error } = await sb.from('bracket_palpites').upsert({ user_id: currentUser.id, dados: dados, atualizado_em: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (error) throw error;
+      return true;
+    } catch (e) { console.error('[Bracket] save:', e); return false; }
+  }
+
+  function brkR32Ordenado() { return (tabelaCache || []).filter(p => p.fase === 'r32').sort((a, b) => a.id - b.id); }
+  function brkVazio() { return { r32: [], r16: [], qf: [], sf: [], final: [] }; }
+  function brkSanitiza(dados) {
+    for (let ri = 1; ri < BRK_ROUNDS.length; ri++) {
+      const r = BRK_ROUNDS[ri], prev = BRK_ROUNDS[ri - 1];
+      for (let j = 0; j < r.n; j++) {
+        const a = dados[prev.key][2 * j], b = dados[prev.key][2 * j + 1];
+        const esc = dados[r.key][j];
+        if (esc && esc !== a && esc !== b) dados[r.key][j] = null;
+      }
+    }
+  }
+  function brkTimes(dados, r32, ri, j) {
+    if (ri === 0) { const p = r32[j]; return p ? [p.time_a, p.time_b] : [null, null]; }
+    const prev = BRK_ROUNDS[ri - 1];
+    return [dados[prev.key][2 * j] || null, dados[prev.key][2 * j + 1] || null];
+  }
+  function brkVencedoresReais(fase) {
+    return new Set((tabelaCache || []).filter(p => p.fase === fase && p.vencedor).map(p => p.vencedor));
+  }
+  function brkScore(dados) {
+    let total = 0; const detalhe = [];
+    const defs = [
+      { pred: 'r32', fase: 'r32', pts: BRK_PTS.r16, lbl: 'Oitavas' },
+      { pred: 'r16', fase: 'r16', pts: BRK_PTS.qf, lbl: 'Quartas' },
+      { pred: 'qf', fase: 'quartas', pts: BRK_PTS.sf, lbl: 'Semi' },
+      { pred: 'sf', fase: 'semi', pts: BRK_PTS.final, lbl: 'Final' },
+      { pred: 'final', fase: 'final', pts: BRK_PTS.campeao, lbl: 'Campeão' }
+    ];
+    defs.forEach(d => {
+      const real = brkVencedoresReais(d.fase);
+      if (!real.size) return;
+      const pred = new Set((dados[d.pred] || []).filter(Boolean));
+      let acertos = 0; pred.forEach(t => { if (real.has(t)) acertos++; });
+      if (acertos) { total += acertos * d.pts; detalhe.push(acertos + '× ' + d.lbl); }
+    });
+    return { total, detalhe };
+  }
+  function brkBloqueado() {
+    const r32 = brkR32Ordenado();
+    if (!r32.length) return false;
+    const inicio = Math.min.apply(null, r32.map(p => new Date(p.data_hora).getTime()));
+    return Date.now() >= inicio;
+  }
+  function brkTeamHtml(rk, j, team, escolha, realVenc) {
+    if (!team) return '<div class="brk-team vazio">a definir</div>';
+    const cls = (escolha === team ? ' escolhido' : '') + (realVenc && realVenc === team && escolha === team ? ' acertou' : '');
+    return '<div class="brk-team' + cls + '" data-rk="' + rk + '" data-j="' + j + '" data-team="' + team + '">' + flagSmallHtml(team) + ' ' + team + '</div>';
+  }
+  async function abrirBracket() {
+    const ov = document.getElementById('bracket-overlay');
+    if (ov) { ov.classList.add('show'); ov.style.display = 'flex'; }
+    const r32 = brkR32Ordenado();
+    if (!r32.length) {
+      document.getElementById('bracket-content').innerHTML = '<div class="brk-aviso" style="padding:30px">⏳ O Round of 32 ainda não foi definido pela FIFA. Volte quando a fase de grupos terminar!</div>';
+      return;
+    }
+    if (!bracketDados) bracketDados = (await cloudMeuBracket()) || brkVazio();
+    BRK_ROUNDS.forEach(r => { if (!Array.isArray(bracketDados[r.key])) bracketDados[r.key] = []; });
+    renderBracket();
+  }
+  function fecharBracket() {
+    const ov = document.getElementById('bracket-overlay');
+    if (ov) { ov.classList.remove('show'); ov.style.display = 'none'; }
+  }
+  function renderBracket() {
+    const el = document.getElementById('bracket-content');
+    if (!el || !bracketDados) return;
+    const r32 = brkR32Ordenado();
+    brkSanitiza(bracketDados);
+    const bloqueado = brkBloqueado();
+    const sc = brkScore(bracketDados);
+    const champ = bracketDados.final[0];
+
+    let html = '<div class="brk-head"><h3>🔮 Meu Palpite do Chaveamento</h3>';
+    if (sc.total > 0 || bloqueado) html += '<div class="brk-score">⭐ <b>' + sc.total + ' pts</b>' + (sc.detalhe.length ? ' · ' + sc.detalhe.join(' · ') : '') + '</div>';
+    html += '</div>';
+    html += '<div class="brk-aviso">' + (bloqueado ? '🔒 O mata-mata começou — seu palpite está travado.' : 'Escolha quem avança em cada jogo até o campeão. Vale pontos conforme suas seleções avançam de verdade (pênaltis incluídos).') + '</div>';
+    if (champ) html += '<div class="brk-champ">🏆 Seu campeão: <span class="brk-champ-nome">' + champ + '</span></div>';
+
+    BRK_ROUNDS.forEach((r, ri) => {
+      html += '<div class="brk-round ' + r.cls + '"><div class="brk-round-tit">' + r.tit + '</div><div class="brk-matches">';
+      for (let j = 0; j < r.n; j++) {
+        const tt = brkTimes(bracketDados, r32, ri, j);
+        const escolha = bracketDados[r.key][j] || null;
+        const realVenc = (ri === 0 && r32[j]) ? r32[j].vencedor : null;
+        html += '<div class="brk-match">' + brkTeamHtml(r.key, j, tt[0], escolha, realVenc) + brkTeamHtml(r.key, j, tt[1], escolha, realVenc) + '</div>';
+      }
+      html += '</div></div>';
+    });
+    if (!bloqueado) html += '<button class="sheet-btn whatsapp" id="bracket-salvar" style="background:linear-gradient(135deg,var(--gold),var(--gold-bright));color:#1a1505;max-width:320px;margin:8px auto 0;display:block">💾 Salvar meu bracket</button>';
+
+    el.innerHTML = html;
+    el.classList.toggle('brk-bloqueado', bloqueado);
+    if (!bloqueado) {
+      el.querySelectorAll('.brk-team[data-team]').forEach(b => b.addEventListener('click', () => {
+        bracketDados[b.dataset.rk][parseInt(b.dataset.j)] = b.dataset.team;
+        renderBracket();
+      }));
+      const salvar = document.getElementById('bracket-salvar');
+      if (salvar) salvar.addEventListener('click', async () => {
+        salvar.disabled = true; salvar.textContent = 'Salvando...';
+        const ok = await cloudSalvarBracket(bracketDados);
+        salvar.disabled = false; salvar.textContent = '💾 Salvar meu bracket';
+        showToast(ok ? '🔮 Bracket salvo!' : '⚠️ Não consegui salvar');
+      });
+    }
+  }
+
   // Modal de chaveamento visual
   function abrirChaveamento() {
     const overlay = document.getElementById('chaveamento-overlay');
@@ -5900,6 +6070,14 @@
       list.style.display = aberto ? 'none' : 'block';
       artToggle.textContent = aberto ? 'Ver ranking ↓' : 'Esconder ↑';
     });
+
+    // Meu palpite do chaveamento (bracket)
+    const brkBtn = document.getElementById('tabela-meubracket-btn');
+    const brkClose = document.getElementById('bracket-close');
+    const brkOverlay = document.getElementById('bracket-overlay');
+    if (brkBtn) brkBtn.addEventListener('click', abrirBracket);
+    if (brkClose) brkClose.addEventListener('click', fecharBracket);
+    if (brkOverlay) brkOverlay.addEventListener('click', (e) => { if (e.target === brkOverlay) fecharBracket(); });
 
     // Chaveamento visual
     const chavBtn = document.getElementById('tabela-chaveamento-btn');
