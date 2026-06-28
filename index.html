@@ -2396,6 +2396,12 @@
   .chav-col-r .chav-bracket-match::after { content: ''; position: absolute; left: -9px; top: 50%; width: 9px; height: 2px; background: rgba(212,175,55,0.5); }
   .chav-col-r .chav-pair::before { content: ''; position: absolute; left: -9px; top: 25%; bottom: 25%; width: 2px; background: rgba(212,175,55,0.5); }
   .chav-col-r .chav-pair::after { content: ''; position: absolute; left: -18px; top: 50%; width: 9px; height: 2px; background: rgba(212,175,55,0.5); }
+  /* Refino: caixas "a definir" ghostadas + conectores mais marcados */
+  .chav-bracket-match.chav-empty { background: transparent; border-style: dashed; border-color: rgba(212,175,55,0.30); box-shadow: none; }
+  .chav-bracket-match.chav-empty .chav-bracket-empty { color: var(--text-muted); }
+  .chav-col-l .chav-pair::before, .chav-col-r .chav-pair::before,
+  .chav-col-l .chav-pair::after, .chav-col-r .chav-pair::after,
+  .chav-col-l .chav-bracket-match::after, .chav-col-r .chav-bracket-match::after { background: rgba(212,175,55,0.62); }
 
   @media (max-width: 900px) { .chav-grupos { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 480px) {
@@ -5889,6 +5895,7 @@
           else if (tercClass.has(c.selecao)) { cls = ' chav-classificado'; extra = '<span class="chav-ok" title="Classificado como melhor 3º">✓</span>'; }
           else cls = ' chav-eliminado';
         }
+        else cls = tercClass ? ' chav-eliminado' : '';  // 4º colocado: eliminado, igual ao 3º que não passou
         const ok = garant[c.selecao] ? '<span class="chav-ok" title="Vaga garantida">✓</span>' : extra;
         const tip = 'J' + c.jogos + ' · ' + c.vitorias + 'V ' + c.empates + 'E ' + c.derrotas + 'D · SG ' + (c.saldo > 0 ? '+' : '') + c.saldo;
         return '<div class="chav-grupo-time' + cls + '" title="' + tip + '">' +
@@ -5909,7 +5916,7 @@
 
   function chavMatchHtml(partida) {
     if (!partida) {
-      return '<div class="chav-bracket-match"><div class="chav-bracket-empty">A definir</div></div>';
+      return '<div class="chav-bracket-match chav-empty"><div class="chav-bracket-empty">A definir</div></div>';
     }
     const encerrada = partida.gols_a != null && partida.gols_b != null;
     const winnerA = encerrada && partida.gols_a > partida.gols_b;
