@@ -2932,6 +2932,7 @@
           <div class="tabela-score-label">Placares certos</div>
         </div>
       </div>
+      <button class="toggle-btn" id="tabela-share-btn" style="width:100%;margin:-6px 0 16px;display:none">📤 Compartilhar minha pontuação</button>
 
       <style>
         #tabela-hoje {
@@ -2963,6 +2964,9 @@
         .hoje-cta { color: var(--gold-bright, #d4af37); font-weight: 700; }
         .hoje-palpite-feito { color: var(--green, #1f9d57); font-weight: 700; }
         .hoje-fechado { color: var(--text-muted, #888); }
+        .hoje-live { color: #fff; background: var(--red, #dc2626); font-weight: 800; padding: 1px 6px; border-radius: 6px; animation: hojePisca 1.4s ease-in-out infinite; }
+        @keyframes hojePisca { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+        .hoje-nudge { font-size: 12px; font-weight: 700; color: var(--gold-bright, #d4af37); background: rgba(212,175,55,0.12); border-radius: 8px; padding: 6px 10px; margin-bottom: 10px; text-align: center; }
         .toggle-btn.quando-ativo { border-color: var(--gold, #9a7611); color: var(--gold-bright, #d4af37); font-weight: 700; }
         /* Classificação dentro das caixas de grupo do chaveamento */
         .chav-grupo-times.chav-tem-classif { grid-template-columns: 1fr; gap: 2px; }
@@ -4472,6 +4476,15 @@
     return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
   }
 
+  async function cloudAdminUltimosSyncs() {
+    if (!sb || !currentUser) return [];
+    try {
+      const { data, error } = await sb.rpc('admin_ultimos_syncs', { limite: 6 });
+      if (error) throw error;
+      return data || [];
+    } catch (e) { console.error('[Admin] saúde do sync:', e); return []; }
+  }
+
   async function loadAndRenderAdmin(force) {
     if (!isAdmin) return;
     const container = document.getElementById('admin-content');
@@ -4484,14 +4497,15 @@
 
     container.innerHTML = '<div class="trades-loading">CARREGANDO...</div>';
 
-    const [overview, users, cidades, cadastrosDia, statusDist, topPaises, ranking] = await Promise.all([
+    const [overview, users, cidades, cadastrosDia, statusDist, topPaises, ranking, syncs] = await Promise.all([
       cloudAdminVisaoGeral(),
       cloudAdminListarUsuarios(),
       cloudAdminTopCidades(),
       cloudAdminCadastrosPorDia(),
       cloudAdminStatusDistribuicao(),
       cloudAdminTopPaises(),
-      cloudAdminRankingPalpites()
+      cloudAdminRankingPalpites(),
+      cloudAdminUltimosSyncs()
     ]);
 
     if (!overview) {
@@ -4506,7 +4520,8 @@
       cadastrosDia: cadastrosDia || [],
       statusDist: statusDist || [],
       topPaises: topPaises || [],
-      ranking: ranking || []
+      ranking: ranking || [],
+      syncs: syncs || []
     };
     renderAdmin(adminCache);
   }
@@ -4515,6 +4530,28 @@
     const container = document.getElementById('admin-content');
     if (!container) return;
     const ov = data.overview;
+
+    // Saúde do Sync (FIFA) — pega falhas silenciosas antes que virem bug
+    const syncs = data.syncs || [];
+    let syncHealthHtml = '';
+    if (syncs.length) {
+      const comErro = syncs.filter(s => s.erro).length;
+      const cor = comErro ? 'var(--red)' : 'var(--green)';
+      const icone = comErro ? '⚠️' : '✅';
+      const fmt = (t) => t ? new Date(t).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: BR_TZ }) : '—';
+      const linhas = syncs.map(s => {
+        const e = s.erro
+          ? '<span style="color:var(--red)">⚠️ ' + String(s.erro).slice(0, 120) + '</span>'
+          : '<span style="color:var(--green)">ok</span>';
+        return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:4px 0;border-top:1px solid var(--border-subtle)">' +
+          '<span style="color:var(--text-muted)">' + fmt(s.terminou_em) + ' · ' + (s.partidas_atualizadas || 0) + ' jogos · ' + (s.artilheiros_atualizados || 0) + ' artilh.</span>' + e +
+          '</div>';
+      }).join('');
+      syncHealthHtml = '<div class="admin-section" style="border-left:3px solid ' + cor + ';padding-left:12px">' +
+        '<div class="admin-section-title">' + icone + ' Saúde do Sync (FIFA) — último: ' + fmt(syncs[0].terminou_em) + (comErro ? ' · ' + comErro + ' com erro' : '') + '</div>' +
+        linhas +
+        '</div>';
+    }
 
     // Cards
     const cards =
@@ -4630,7 +4667,7 @@
       rankingHtml += '</tbody></table></div>';
     }
 
-    container.innerHTML = cards + chartsHtml + cidadesHtml + rankingHtml + usersHtml;
+    container.innerHTML = syncHealthHtml + cards + chartsHtml + cidadesHtml + rankingHtml + usersHtml;
 
     // Renderiza os gráficos depois do innerHTML pronto
     setTimeout(() => renderAdminCharts(data), 50);
@@ -5074,7 +5111,8 @@
       const horaJogo = p.data_hora ? new Date(p.data_hora).getTime() : 0;
       const aberto = p.status === 'agendada' && horaJogo > 0 && (horaJogo - PALPITE_ANTECEDENCIA_MS) > Date.now();
       let acao;
-      if (p.meu_palpite_a != null) acao = '<span class="hoje-palpite-feito">✓ ' + p.meu_palpite_a + '×' + p.meu_palpite_b + '</span>';
+      if (p.status === 'em_andamento') acao = '<span class="hoje-live">🔴 AO VIVO' + (p.gols_a != null ? ' ' + p.gols_a + '×' + p.gols_b : '') + '</span>';
+      else if (p.meu_palpite_a != null) acao = '<span class="hoje-palpite-feito">✓ ' + p.meu_palpite_a + '×' + p.meu_palpite_b + '</span>';
       else if (aberto) acao = '<span class="hoje-cta">👆 palpitar</span>';
       else acao = '<span class="hoje-fechado">⏰ fechado</span>';
       return '<button class="hoje-jogo" data-id="' + p.id + '">' +
@@ -5083,7 +5121,12 @@
         '<span class="hoje-acao">' + acao + '</span>' +
         '</button>';
     }).join('');
-    el.innerHTML = '<div class="hoje-head">⚽ Jogos de hoje <span class="hoje-count">' + hoje.length + '</span></div><div class="hoje-list">' + linhas + '</div>';
+    const faltaPalpitar = hoje.filter(p => {
+      const hj = p.data_hora ? new Date(p.data_hora).getTime() : 0;
+      return p.status === 'agendada' && hj > 0 && (hj - PALPITE_ANTECEDENCIA_MS) > Date.now() && p.meu_palpite_a == null;
+    }).length;
+    const nudge = (faltaPalpitar > 0 && currentUser) ? '<div class="hoje-nudge">⚠️ Falta palpitar ' + faltaPalpitar + ' jogo' + (faltaPalpitar > 1 ? 's' : '') + ' de hoje!</div>' : '';
+    el.innerHTML = '<div class="hoje-head">⚽ Jogos de hoje <span class="hoje-count">' + hoje.length + '</span></div>' + nudge + '<div class="hoje-list">' + linhas + '</div>';
     el.style.display = 'block';
     el.querySelectorAll('.hoje-jogo').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -5315,6 +5358,8 @@
     document.getElementById('tabela-meus-pontos').textContent = pontos;
     document.getElementById('tabela-meus-palpites').textContent = totalPalpites;
     document.getElementById('tabela-meus-acertos').textContent = placaresCertos;
+    const shareBtn = document.getElementById('tabela-share-btn');
+    if (shareBtn) shareBtn.style.display = (currentUser && totalPalpites > 0) ? 'inline-flex' : 'none';
     renderTabelaConteudo(partidas);
     renderJogosHoje();
   }
@@ -5610,6 +5655,21 @@
       renderJogosHoje();
     });
     if (adminAddBtn) adminAddBtn.addEventListener('click', () => abrirModalPartidaAdmin(null));
+
+    // Compartilhar pontuação no WhatsApp
+    const shareBtn = document.getElementById('tabela-share-btn');
+    if (shareBtn) shareBtn.addEventListener('click', () => {
+      const pts = document.getElementById('tabela-meus-pontos').textContent;
+      const pal = document.getElementById('tabela-meus-palpites').textContent;
+      const ac = document.getElementById('tabela-meus-acertos').textContent;
+      const apelido = currentProfile && currentProfile.apelido ? ' (' + currentProfile.apelido + ')' : '';
+      const url = window.location.href.split('#')[0].split('?')[0];
+      const msg = '🏆 Meu bolão da Copa 2026' + apelido + ':\n' +
+        '⭐ ' + pts + ' pontos\n' +
+        '🎯 ' + pal + ' palpites · ' + ac + ' placares cravados\n\n' +
+        'Vem jogar comigo: ' + url;
+      window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+    });
 
     // Botão sincronizar (acessível pra todos)
     const syncBtn = document.getElementById('tabela-sync-btn');
