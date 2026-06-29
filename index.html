@@ -6018,8 +6018,13 @@
     // Preenche cada fase: jogo real se existir; senão o classificado (vencedor) já "sobe"
     // com o adversário "a definir" até o outro jogo do par ser decidido.
     const agenda = await cloudBracketAgenda();
+    // Casa a data pelo TIME real que a FIFA já colocou no jogo — NÃO por posição (a ordem do
+    // external_id do mata-mata é cronológica, não a do chaveamento). Só mostra data verdadeira.
+    function agendaPorTime(faseKey, t) {
+      if (!t) return null;
+      return (agenda[faseKey] || []).find(x => x.time_a === t || x.time_b === t) || null;
+    }
     function preencher(reais, anterior, faseKey) {
-      const ag = agenda[faseKey] || [];
       const n = Math.floor(anterior.length / 2);
       const out = [];
       for (let j = 0; j < n; j++) {
@@ -6027,8 +6032,9 @@
         const a = anterior[2 * j], b = anterior[2 * j + 1];
         const tA = a && a.vencedor ? a.vencedor : null;
         const tB = b && b.vencedor ? b.vencedor : null;
-        const dh = ag[j] ? ag[j].data_hora : null;
-        out.push((tA || tB || dh) ? { sintetico: true, time_a: tA, time_b: tB, data_hora: dh, estadio: ag[j] ? ag[j].estadio : null } : null);
+        if (!tA && !tB) { out.push(null); continue; }
+        const ag = agendaPorTime(faseKey, tA) || agendaPorTime(faseKey, tB);
+        out.push({ sintetico: true, time_a: tA, time_b: tB, data_hora: ag ? ag.data_hora : null, estadio: ag ? ag.estadio : null });
       }
       return out;
     }
@@ -6040,14 +6046,13 @@
       const a = semie[0], b = semie[1];
       const tA = a && a.vencedor ? a.vencedor : null;
       const tB = b && b.vencedor ? b.vencedor : null;
-      const agf = agenda['final'] || [];
-      const dh = agf[0] ? agf[0].data_hora : null;
-      if (tA || tB || dh) finalEff = { sintetico: true, time_a: tA, time_b: tB, data_hora: dh, estadio: agf[0] ? agf[0].estadio : null };
+      const agf = (agenda['final'] || [])[0];  // jogo único: data fixa, sem ambiguidade
+      if (tA || tB || agf) finalEff = { sintetico: true, time_a: tA, time_b: tB, data_hora: agf ? agf.data_hora : null, estadio: agf ? agf.estadio : null };
     }
     let terceiroEff = terceiro;
     if (!terceiroEff) {
-      const ag3 = agenda['3o_lugar'] || [];
-      if (ag3[0]) terceiroEff = { sintetico: true, time_a: null, time_b: null, data_hora: ag3[0].data_hora, estadio: ag3[0].estadio };
+      const ag3 = (agenda['3o_lugar'] || [])[0];
+      if (ag3) terceiroEff = { sintetico: true, time_a: null, time_b: null, data_hora: ag3.data_hora, estadio: ag3.estadio };
     }
 
     // Monta bracket — esquerda 8 R32, direita 8 R32
