@@ -2402,6 +2402,8 @@
   .chav-col-l .chav-pair::before, .chav-col-r .chav-pair::before,
   .chav-col-l .chav-pair::after, .chav-col-r .chav-pair::after,
   .chav-col-l .chav-bracket-match::after, .chav-col-r .chav-bracket-match::after { background: rgba(212,175,55,0.62); }
+  .chav-bracket-team.chav-tbd { color: var(--text-muted); font-style: italic; font-weight: 400; }
+  .chav-bracket-match.chav-sintetico { border-style: dashed; border-color: rgba(212,175,55,0.45); }
 
   @media (max-width: 900px) { .chav-grupos { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 480px) {
@@ -5928,10 +5930,13 @@
     const quando = partida.data_hora ? new Date(partida.data_hora).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: BR_TZ }) : '';
     const local = partida.estadio ? ' · ' + partida.estadio : '';
     const cap = quando ? '<div class="chav-match-quando">📅 ' + quando + local + '</div>' : '';
-    return '<div class="chav-bracket-match ' + (encerrada ? 'played' : '') + '">' +
+    const teamRow = (code, cls, score) => code
+      ? '<div class="chav-bracket-team ' + cls + '">' + chavFlagHtml(code) + '<span>' + code + '</span>' + score + '</div>'
+      : '<div class="chav-bracket-team chav-tbd"><span>a definir</span></div>';
+    return '<div class="chav-bracket-match ' + (encerrada ? 'played' : '') + (partida.sintetico ? ' chav-sintetico' : '') + '">' +
       cap +
-      '<div class="chav-bracket-team ' + clsA + '">' + chavFlagHtml(partida.time_a) + '<span>' + partida.time_a + '</span>' + scoreA + '</div>' +
-      '<div class="chav-bracket-team ' + clsB + '">' + chavFlagHtml(partida.time_b) + '<span>' + partida.time_b + '</span>' + scoreB + '</div>' +
+      teamRow(partida.time_a, clsA, scoreA) +
+      teamRow(partida.time_b, clsB, scoreB) +
     '</div>';
   }
 
@@ -5998,15 +6003,40 @@
         : '<div style="font-size:70px;color:var(--gold)">?</div>';
     }
 
+    // Preenche cada fase: jogo real se existir; senão o classificado (vencedor) já "sobe"
+    // com o adversário "a definir" até o outro jogo do par ser decidido.
+    function preencher(reais, anterior) {
+      const n = Math.floor(anterior.length / 2);
+      const out = [];
+      for (let j = 0; j < n; j++) {
+        if (reais[j]) { out.push(reais[j]); continue; }
+        const a = anterior[2 * j], b = anterior[2 * j + 1];
+        const tA = a && a.vencedor ? a.vencedor : null;
+        const tB = b && b.vencedor ? b.vencedor : null;
+        out.push((tA || tB) ? { sintetico: true, time_a: tA, time_b: tB } : null);
+      }
+      return out;
+    }
+    const r16e = preencher(r16, r32);
+    const quartase = preencher(quartas, r16e);
+    const semie = preencher(semi, quartase);
+    let finalEff = final;
+    if (!finalEff) {
+      const a = semie[0], b = semie[1];
+      const tA = a && a.vencedor ? a.vencedor : null;
+      const tB = b && b.vencedor ? b.vencedor : null;
+      if (tA || tB) finalEff = { sintetico: true, time_a: tA, time_b: tB };
+    }
+
     // Monta bracket — esquerda 8 R32, direita 8 R32
     const r32Esq = r32.slice(0, 8);
     const r32Dir = r32.slice(8, 16);
-    const r16Esq = r16.slice(0, 4);
-    const r16Dir = r16.slice(4, 8);
-    const quartasEsq = quartas.slice(0, 2);
-    const quartasDir = quartas.slice(2, 4);
-    const semiEsq = semi.slice(0, 1)[0];
-    const semiDir = semi.slice(1, 2)[0];
+    const r16Esq = r16e.slice(0, 4);
+    const r16Dir = r16e.slice(4, 8);
+    const quartasEsq = quartase.slice(0, 2);
+    const quartasDir = quartase.slice(2, 4);
+    const semiEsq = semie.slice(0, 1)[0];
+    const semiDir = semie.slice(1, 2)[0];
 
     function colHtml(items, fillEmpty) {
       let arr = items.slice();
@@ -6042,7 +6072,7 @@
         colWrap('Semi', semiEsq ? [semiEsq] : [], 1, 'l') +
         '<div class="chav-center">' +
           '<div class="chav-col-tit chav-final-tit">FINAL</div>' +
-          '<div class="chav-final-match">' + chavMatchHtml(final) + '</div>' +
+          '<div class="chav-final-match">' + chavMatchHtml(finalEff) + '</div>' +
           '<div class="chav-trofeu-box"><h3>CAMPEÃO MUNDIAL</h3>' + campeaoHtml + '</div>' +
           '<div class="chav-3o"><div class="chav-col-tit">3º Lugar</div>' + chavMatchHtml(terceiro) + '</div>' +
         '</div>' +
