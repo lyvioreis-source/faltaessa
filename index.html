@@ -5863,6 +5863,18 @@
     } catch (e) { console.error('[Chav] classificação:', e); return {}; }
   }
 
+  async function cloudBracketAgenda() {
+    if (!sb) return {};
+    try {
+      const { data, error } = await sb.rpc('listar_bracket_agenda');
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach(r => { (map[r.fase] = map[r.fase] || []).push(r); });
+      Object.keys(map).forEach(f => map[f].sort((a, b) => a.external_id - b.external_id));
+      return map;
+    } catch (e) { console.error('[Chav] agenda:', e); return {}; }
+  }
+
   // Seleções que JÁ GARANTIRAM o top 2 (vaga) matematicamente, mesmo no pior caso.
   // T está garantido se, no piso de pontos dele, no máx. 1 outra seleção pode alcançá-lo.
   function timesGarantidos(rows) {
@@ -6005,7 +6017,9 @@
 
     // Preenche cada fase: jogo real se existir; senão o classificado (vencedor) já "sobe"
     // com o adversário "a definir" até o outro jogo do par ser decidido.
-    function preencher(reais, anterior) {
+    const agenda = await cloudBracketAgenda();
+    function preencher(reais, anterior, faseKey) {
+      const ag = agenda[faseKey] || [];
       const n = Math.floor(anterior.length / 2);
       const out = [];
       for (let j = 0; j < n; j++) {
@@ -6013,19 +6027,27 @@
         const a = anterior[2 * j], b = anterior[2 * j + 1];
         const tA = a && a.vencedor ? a.vencedor : null;
         const tB = b && b.vencedor ? b.vencedor : null;
-        out.push((tA || tB) ? { sintetico: true, time_a: tA, time_b: tB } : null);
+        const dh = ag[j] ? ag[j].data_hora : null;
+        out.push((tA || tB || dh) ? { sintetico: true, time_a: tA, time_b: tB, data_hora: dh, estadio: ag[j] ? ag[j].estadio : null } : null);
       }
       return out;
     }
-    const r16e = preencher(r16, r32);
-    const quartase = preencher(quartas, r16e);
-    const semie = preencher(semi, quartase);
+    const r16e = preencher(r16, r32, 'r16');
+    const quartase = preencher(quartas, r16e, 'quartas');
+    const semie = preencher(semi, quartase, 'semi');
     let finalEff = final;
     if (!finalEff) {
       const a = semie[0], b = semie[1];
       const tA = a && a.vencedor ? a.vencedor : null;
       const tB = b && b.vencedor ? b.vencedor : null;
-      if (tA || tB) finalEff = { sintetico: true, time_a: tA, time_b: tB };
+      const agf = agenda['final'] || [];
+      const dh = agf[0] ? agf[0].data_hora : null;
+      if (tA || tB || dh) finalEff = { sintetico: true, time_a: tA, time_b: tB, data_hora: dh, estadio: agf[0] ? agf[0].estadio : null };
+    }
+    let terceiroEff = terceiro;
+    if (!terceiroEff) {
+      const ag3 = agenda['3o_lugar'] || [];
+      if (ag3[0]) terceiroEff = { sintetico: true, time_a: null, time_b: null, data_hora: ag3[0].data_hora, estadio: ag3[0].estadio };
     }
 
     // Monta bracket — esquerda 8 R32, direita 8 R32
@@ -6074,7 +6096,7 @@
           '<div class="chav-col-tit chav-final-tit">FINAL</div>' +
           '<div class="chav-final-match">' + chavMatchHtml(finalEff) + '</div>' +
           '<div class="chav-trofeu-box"><h3>CAMPEÃO MUNDIAL</h3>' + campeaoHtml + '</div>' +
-          '<div class="chav-3o"><div class="chav-col-tit">3º Lugar</div>' + chavMatchHtml(terceiro) + '</div>' +
+          '<div class="chav-3o"><div class="chav-col-tit">3º Lugar</div>' + chavMatchHtml(terceiroEff) + '</div>' +
         '</div>' +
         colWrap('Semi', semiDir ? [semiDir] : [], 1, 'r') +
         colWrap('Quartas', quartasDir, 2, 'r') +
