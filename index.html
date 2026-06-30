@@ -6027,11 +6027,23 @@
     function preencher(reais, anterior, faseKey) {
       const n = Math.floor(anterior.length / 2);
       const out = [];
+      const usados = new Set();
+      const idDe = r => (r && r.id != null) ? r.id : (r ? r.external_id : null);
       for (let j = 0; j < n; j++) {
-        if (reais[j]) { out.push(reais[j]); continue; }
         const a = anterior[2 * j], b = anterior[2 * j + 1];
         const tA = a && a.vencedor ? a.vencedor : null;
         const tB = b && b.vencedor ? b.vencedor : null;
+        // Encaixa o jogo REAL desta posição pelos TIMES que sobem — NÃO pelo índice no
+        // array (a ordem por external_id do mata-mata é cronológica, não a do chaveamento).
+        // Sem isso, um R16 já definido pela FIFA caía no 1º slot e duplicava o sintético.
+        let real = null;
+        if (tA || tB) {
+          real = reais.find(r => !usados.has(idDe(r)) && (
+            (tA && (r.time_a === tA || r.time_b === tA)) ||
+            (tB && (r.time_a === tB || r.time_b === tB))
+          )) || null;
+        }
+        if (real) { usados.add(idDe(real)); out.push(real); continue; }
         if (!tA && !tB) { out.push(null); continue; }
         const ag = agendaPorTime(faseKey, tA) || agendaPorTime(faseKey, tB);
         out.push({ sintetico: true, time_a: tA, time_b: tB, data_hora: ag ? ag.data_hora : null, estadio: ag ? ag.estadio : null });
