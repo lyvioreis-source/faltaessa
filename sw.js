@@ -1,6 +1,11 @@
 // Service worker do Falta Essa — cache da casca do app (offline) + HTML sempre fresco.
-const CACHE = 'faltaessa-v1';
+const CACHE = 'faltaessa-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.png'];
+
+// Página pede pra este SW assumir na hora (usado no fluxo de auto-update).
+self.addEventListener('message', (e) => {
+  if (e.data === 'skip-waiting') self.skipWaiting();
+});
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

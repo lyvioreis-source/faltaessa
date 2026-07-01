@@ -14,11 +14,52 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 <script>
+  // Marcador da versão publicada. Bumpar a cada deploy (o auto-update usa ele
+  // pra saber que saiu coisa nova e recarregar o app sozinho).
+  window.APP_BUILD = '2026-06-30-1';
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function (e) { console.log('SW não registrou:', e); });
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        // Procura atualização do próprio SW e, quando um novo assume, recarrega 1x.
+        reg.update();
+        reg.addEventListener('updatefound', function () {
+          var nv = reg.installing;
+          if (!nv) return;
+          nv.addEventListener('statechange', function () {
+            if (nv.state === 'installed' && navigator.serviceWorker.controller) nv.postMessage('skip-waiting');
+          });
+        });
+      }).catch(function (e) { console.log('SW não registrou:', e); });
+
+      var recarregando = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (recarregando) return; recarregando = true; location.reload();
+      });
     });
   }
+
+  // Auto-update do CONTEÚDO (index.html): quando o app volta ao foco, confere se
+  // a versão publicada mudou e recarrega. Resolve o "app preso numa versão antiga"
+  // mesmo em PWA instalado, sem depender de fechar/reabrir na mão.
+  (function () {
+    var checando = false, ultimaChecagem = 0;
+    async function checarAtualizacao() {
+      if (checando || document.hidden) return;
+      if (Date.now() - ultimaChecagem < 30000) return; // no máx. 1x a cada 30s
+      checando = true; ultimaChecagem = Date.now();
+      try {
+        var r = await fetch('index.html?v=' + Date.now(), { cache: 'no-store' });
+        if (r.ok) {
+          var txt = await r.text();
+          var m = txt.match(/APP_BUILD\s*=\s*'([^']+)'/);
+          if (m && m[1] && m[1] !== window.APP_BUILD) location.reload();
+        }
+      } catch (_) { /* offline: ignora */ } finally { checando = false; }
+    }
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) checarAtualizacao(); });
+    window.addEventListener('focus', checarAtualizacao);
+  })();
 </script>
 
 <!-- ============================================================== -->
